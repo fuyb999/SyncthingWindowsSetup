@@ -1,0 +1,8 @@
+Downloaded build assets
+
+ErrInfo v0.0.1
+ServMan v0.0.2
+asmt v0.0.4
+shawl v1.8.0
+stctl v0.0.5
+syncthing v2.0.16

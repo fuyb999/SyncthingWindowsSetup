@@ -8,10 +8,10 @@
 
 // BEGIN LOCALIZATION
 var MSG_DLG_TITLE            = "Syncthing";
-var MSG_QUERY_CREATE         = "Create scheduled task to start Syncthing at logon?";
-var MSG_QUERY_REMOVE         = "Remove scheduled task that starts Syncthing at logon?";
-var MSG_TASK_NAME            = "Start Syncthing at logon";
-var MSG_ERROR_DESC_NOT_FOUND = "(No error description found)";
+var MSG_QUERY_CREATE         = "\u8981\u521b\u5efa\u4e00\u4e2a\u5728\u767b\u5f55\u65f6\u542f\u52a8 Syncthing \u7684\u8ba1\u5212\u4efb\u52a1\u5417\uff1f";
+var MSG_QUERY_REMOVE         = "\u8981\u5220\u9664\u5728\u767b\u5f55\u65f6\u542f\u52a8 Syncthing \u7684\u8ba1\u5212\u4efb\u52a1\u5417\uff1f";
+var MSG_TASK_NAME            = "\u767b\u5f55\u65f6\u542f\u52a8 Syncthing";
+var MSG_ERROR_DESC_NOT_FOUND = "(\u672a\u627e\u5230\u9519\u8bef\u63cf\u8ff0)";
 // END LOCALIZATION
 
 // Global Windows API constants
@@ -151,7 +151,7 @@ function removeTask(taskName) {
 }
 
 function help() {
-  WScript.Echo("Usage: " + WScript.ScriptName + " /create [/startonacpoweronly] [/cloudurl:<url>]|/remove [/silent]");
+  WScript.Echo("\u7528\u6cd5: " + WScript.ScriptName + " /create [/startonacpoweronly] [/cloudurl:<url>]|/remove [/silent]");
 }
 
 function reportStatus(errorCode) {

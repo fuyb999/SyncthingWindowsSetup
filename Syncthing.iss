@@ -12,11 +12,6 @@
 
 #define UninstallIfSetupVersionOlderThan "1.27.11"
 #define AppID "{1EEA2B6F-FD76-47D7-B74C-03E14CF043F9}"
-#define GitHubUserName "syncthing"
-#define GitHubProjectName "syncthing"
-#define GitHubVersionTagURLPattern "https://api.github.com/repos/%s/%s/releases/latest"
-#define GitHubDownloadURLPattern "https://github.com/%s/%s/releases/download/%s/%s"
-#define ZipFileNamePattern "syncthing-windows-%s-%s.zip"
 #define UnzipPattern "*/syncthing.exe */AUTHORS.txt */README.txt */LICENSE.txt"
 #define AppName "Syncthing"
 #define AppPublisher "Syncthing Foundation"
@@ -35,6 +30,10 @@
 #define ScriptNameSetSyncthingConfig "SetSyncthingConfig.js"
 #define ScriptNameSyncthingFirewallRule "SyncthingFirewallRule.js"
 #define ScriptNameSyncthingLogonTask "SyncthingLogonTask.js"
+#define OfflineZipNameX86 "syncthing-windows-386.zip"
+#define OfflineZipNameX64 "syncthing-windows-amd64.zip"
+#define OfflineZipNameArm64 "syncthing-windows-arm64.zip"
+#define DefaultCloudURL ""
 
 [Setup]
 AppId={{#AppID}
@@ -68,6 +67,8 @@ WizardSizePercent=120
 UninstallFilesDir={app}\uninstall
 UninstallDisplayIcon={app}\syncthing.ico
 UninstallDisplayName={code:GetUninstallDisplayName}
+ShowLanguageDialog=no
+LanguageDetectionMethod=none
 VersionInfoProductName={#AppName}
 VersionInfoCompany={#AppPublisher}
 VersionInfoVersion={#SetupVersion}
@@ -76,14 +77,16 @@ VersionInfoVersion={#SetupVersion}
 SetupWindowTitle=Syncthing Windows Setup
 
 [Languages]
+Name: "zh-Hans"; MessagesFile: "compiler:Languages\ChineseSimplified.isl,Messages-zh-Hans.isl"; InfoBeforeFile: "zh-Hans-README.rtf"
 Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"; InfoBeforeFile: "en-README.rtf"
 
 ; See building.md file for localization details
 #define protected
 #define LocalizationFile AddBackslash(SourcePath) + "Localization.ini"
-#define NumLanguages 1
+#define NumLanguages 2
 #dim    Languages[NumLanguages]
-#define Languages[0] "en"
+#define Languages[0] "zh-Hans"
+#define Languages[1] "en"
 
 [Files]
 ; Preprocessor localization
@@ -97,7 +100,7 @@ Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"; InfoBeforeFile
 Source: "{#FileNameLicense}"; DestName: "{#LicenseFileName}"; flags: dontcopy
 Source: "{#ScriptNameFirewallRule}"; DestDir: "{app}"; DestName: "{#ScriptNameSyncthingFirewallRule}"; Languages: "{#Language}"
 Source: "{#ScriptNameSetConfig}"; DestDir: "{app}"; DestName: "{#ScriptNameSetSyncthingConfig}"; Languages: "{#Language}"
-Source: "{#ScriptNameLogonTask}"; DestDir: "{app}"; DestName: "{#ScriptNameSyncthingLogonTask}"; Languages: "{#language}"; Check: not IsAdminInstallMode()
+Source: "{#ScriptNameLogonTask}"; DestDir: "{app}"; DestName: "{#ScriptNameSyncthingLogonTask}"; Languages: "{#Language}"; Check: not IsAdminInstallMode()
 #endsub
 #for { i = 0; i < NumLanguages; i++ } LocalizeFiles
 
@@ -106,10 +109,12 @@ Source: "{#ScriptNameLogonTask}"; DestDir: "{app}"; DestName: "{#ScriptNameSynct
 Source: "UninsIS.dll"; Flags: dontcopy
 ; Process checking
 Source: "ProcessCheck.dll"; Flags: dontcopy
-; Command-line JSON parser (get latest version tag from GitHub)
-Source: "jq.exe"; Flags: dontcopy
-; unzip utility for extracting Syncthing after downloading
+; unzip utility for validating and extracting Syncthing
 Source: "unzip.exe"; Flags: dontcopy
+; Bundled offline installation zip files
+Source: "offline\{#OfflineZipNameX86}"; Flags: dontcopy skipifsourcedoesntexist
+Source: "offline\{#OfflineZipNameX64}"; Flags: dontcopy skipifsourcedoesntexist
+Source: "offline\{#OfflineZipNameArm64}"; Flags: dontcopy skipifsourcedoesntexist
 
 ; Setup version INI file
 Source: "{#IniFileName}"; DestDir: "{app}"
@@ -153,7 +158,7 @@ Name: "{autodesktop}\{cm:ShortcutNameConfigurationPage}"; \
 ; Non-admin icons
 Name: "{group}\{cm:ShortcutNameStartSyncthing}"; \
   Filename: "{app}\stctl.exe"; \
-  Parameters: "--start"; \
+  Parameters: "{code:GetStartShortcutParameters}"; \
   Comment: "{cm:ShortcutNameStartSyncthingComment}"; \
   Check: not IsAdminInstallMode()
 Name: "{group}\{cm:ShortcutNameStopSyncthing}"; \
@@ -242,17 +247,12 @@ Type: files; Name: "{app}\LICENSE.txt"
 
 [Code]
 
-// General notes about online vs. offline installation:
-// * LatestVersionTag gets set if we connected to github.com, downloaded latest
-//   version JSON file, and retrieved the latest version tag using jq.exe
-// * LatestVersionTag = '' if we couldn't get to github.com
-// * Therefore, LatestVersionTag = '' means offline install
-// * If offline (LatestVersionTag empty), ZipFilePath gets set by:
+// General notes about offline installation:
+// * Setup never downloads Syncthing during installation
+// * ZipFilePath gets set by:
 //   a. /zipfilepath= command line parameter, or
-//   b. Wizard file selection page
-// * If user specifies /zipfilepath, don't attempt to get latest version JSON
-// * If online (LatestVersionTag not empty), ZipFilePath gets set in
-//   NextButtonClick event
+//   b. bundled offline zip compiled into Setup, or
+//   c. Wizard file selection page
 // * Install only proceeds if zip file tests ok (i.e., unzip -t returns 0)
 
 const
@@ -268,10 +268,10 @@ var
   OutputMsgMemoPage0: TOutputMsgMemoWizardPage;
   ConfigPage0: TInputQueryWizardPage;
   FilePage0: TInputFileWizardPage;
-  DownloadPage0: TDownloadWizardPage;
   // Configuration page values
-  AutoUpgradeInterval, ListenAddress, ListenPort, RelaysEnabled: string;
-  ServiceAccountUserName, ExecOutputFirstLine, ZipFilePath, LatestVersionTag: string;
+  AutoUpgradeInterval, ListenAddress, ListenPort, RelaysEnabled, CloudURL: string;
+  ServiceAccountUserName, ExecOutputFirstLine, ZipFilePath, BundledZipFileName: string;
+  SkipZipFilePage, UsingBundledZip: Boolean;
 
 // Windows API functions
 function GetUserNameExW(NameFormat: Integer; lpNameBuffer: string; var nSize: DWORD): Boolean;
@@ -443,52 +443,69 @@ begin
     ExpandConstant(Format('-t "%s" {#UnzipPattern}', [ZipFilePath])), true) = 0;
 end;
 
-function OnDownloadProgress(const Url, Filename: string; const Progress, ProgressMax: Int64): Boolean;
+function GetBundledZipFileName(): string;
 begin
-  result := true;
-  if Progress = ProgressMax then
-    Log(CustomMessage('DownloadFileSucceeded'));
-end;
-
-function DownloadFile(const URL, LocalFileName: string): Boolean;
-var
-  BytesDownloaded: Int64;
-begin
-  result := false;
-  try
-    BytesDownloaded := DownloadTemporaryFile(URL, LocalFileName, '', @OnDownloadProgress);
-    result := BytesDownloaded > 0;
-  except
+  result := '';
+  case ProcessorArchitecture() of
+    paX86, paUnknown: result := '{#OfflineZipNameX86}';
+    paX64: result := '{#OfflineZipNameX64}';
+    paArm64: result := '{#OfflineZipNameArm64}';
   end;
 end;
 
-function GetLatestVersionJsonFilePath(): string;
+function TryUseBundledZip(): Boolean;
 var
-  URL, UniqueFilePath: string;
+  CandidateZipPath: string;
 begin
-  result := '';
-  URL := Format('{#GitHubVersionTagURLPattern}', ['{#GitHubUserName}', '{#GitHubProjectName}']);
-  UniqueFilePath := GenerateUniqueName(ExpandConstant('{tmp}'), '.json');
-  if DownloadFile(URL, ExtractFileName(UniqueFilePath)) then
-    result := UniqueFilePath;
+  result := false;
+  UsingBundledZip := false;
+  BundledZipFileName := GetBundledZipFileName();
+  if BundledZipFileName = '' then
+    exit;
+  try
+    ExtractTemporaryFile(BundledZipFileName);
+    CandidateZipPath := ExpandConstant('{tmp}\') + BundledZipFileName;
+    if FileExists(CandidateZipPath) and TestZipFile(CandidateZipPath) then
+    begin
+      ZipFilePath := CandidateZipPath;
+      UsingBundledZip := true;
+      Log(FmtMessage(CustomMessage('BundledZipFound'), [BundledZipFileName]));
+      result := true;
+    end
+    else
+      Log(FmtMessage(CustomMessage('BundledZipNotValid'), [BundledZipFileName]));
+  except
+    Log(FmtMessage(CustomMessage('BundledZipNotFound'), [BundledZipFileName]));
+  end;
+  if not result then
+    ZipFilePath := '';
 end;
 
-procedure GetLatestVersionTag();
-var
-  JsonFilePath: string;
+function QuoteValue(const Value: string): string;
 begin
-  if LatestVersionTag <> '' then
-    exit;
-  JsonFilePath := GetLatestVersionJsonFilePath();
-  if JsonFilePath = '' then
-    exit;
-  if ExecEx(ExpandConstant('{tmp}\jq.exe'), '-r .name "' + JsonFilePath + '"', true) = 0 then
-  begin
-    LatestVersionTag := ExecOutputFirstLine;
-    Log('Latest version tag: ' + LatestVersionTag);
-  end
-  else
-    Log('Failed to get latest version tag');
+  result := '"' + Value + '"';
+end;
+
+function GetStartSyncthingParameters(const Quiet: Boolean): string;
+begin
+  result := '--start';
+  if Quiet then
+    result := result + ' -q';
+  if Trim(CloudURL) <> '' then
+    result := result + ' -- --cloud-url ' + QuoteValue(CloudURL);
+end;
+
+// Param parameter is required
+function GetStartShortcutParameters(Param: string): string;
+begin
+  result := GetStartSyncthingParameters(false);
+end;
+
+function GetLogonTaskParameters(const BaseParams: string): string;
+begin
+  result := BaseParams;
+  if Trim(CloudURL) <> '' then
+    result := result + ' /cloudurl:' + QuoteValue(CloudURL);
 end;
 
 function InitializeSetup(): Boolean;
@@ -539,24 +556,37 @@ begin
     Trim(ExpandConstant('{param:listenport|{#DefaultListenPort}}')));
   RelaysEnabled := GetPreviousData('RelaysEnabled',
     Trim(ExpandConstant('{param:relaysenabled|{#DefaultRelaysEnabled}}')));
+  CloudURL := GetPreviousData('CloudURL',
+    Trim(ExpandConstant('{param:cloudurl|{#DefaultCloudURL}}')));
   ExtractTemporaryFile('unzip.exe');
+  SkipZipFilePage := false;
+  UsingBundledZip := false;
+  BundledZipFileName := '';
   ZipFilePath := Trim(ExpandConstant('{param:zipfilepath}'));
-  if ZipFilePath = '' then
-  begin
-    // Zip file path not specified on command line; try to get it dynamically
-    ExtractTemporaryFile('jq.exe');
-    GetLatestVersionTag();
-    if LatestVersionTag = '' then
-    begin
-      Msg := CustomMessage('InitializeSetupWarning0');
-      Log(Msg);
-    end;
-  end
-  else
+  if ZipFilePath <> '' then
   begin
     // Assume installer directory if no path specifed with zip file name
     if Pos('\', ZipFilePath) = 0 then
       ZipFilePath := ExpandConstant('{src}\') + ZipFilePath;
+    if FileExists(ZipFilePath) then
+    begin
+      Log(CustomMessage('ZipFilePathFound'));
+      if TestZipFile(ZipFilePath) then
+        SkipZipFilePage := true
+      else
+        Log(CustomMessage('ZipFileNotValid'));
+    end;
+    else
+      Log(CustomMessage('ZipFilePathNotFound'));
+  end
+  else if TryUseBundledZip() then
+  begin
+    SkipZipFilePage := true;
+  end
+  else
+  begin
+    Msg := CustomMessage('InitializeSetupWarning0');
+    Log(Msg);
   end;
 end;
 
@@ -597,14 +627,12 @@ begin
   ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item1'), ['{#DefaultListenAddress}']), false);
   ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item2'), ['{#DefaultListenPort}']), false);
   ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item3'), ['{#DefaultRelaysEnabled}']), false);
+  ConfigPage0.Add(CustomMessage('ConfigPage0Item4'), false);
   ConfigPage0.Values[0] := AutoUpgradeInterval;
   ConfigPage0.Values[1] := ListenAddress;
   ConfigPage0.Values[2] := ListenPort;
   ConfigPage0.Values[3] := RelaysEnabled;
-  // Custom download page(s)
-  DownloadPage0 := CreateDownloadPage(SetupMessage(msgWizardPreparing),
-    SetupMessage(msgPreparingDesc), @OnDownloadProgress);
-  DownloadPage0.ShowBaseNameInsteadOfUrl := true;
+  ConfigPage0.Values[4] := CloudURL;
 end;
 
 function InitializeUninstall(): Boolean;
@@ -622,50 +650,24 @@ begin
   SetPreviousData(PreviousDataKey, 'ListenAddress', ListenAddress);
   SetPreviousData(PreviousDataKey, 'ListenPort', ListenPort);
   SetPreviousData(PreviousDataKey, 'RelaysEnabled', RelaysEnabled);
+  SetPreviousData(PreviousDataKey, 'CloudURL', CloudURL);
   if IsAdminInstallMode() then
   begin
     SetPreviousData(PreviousDataKey, 'ServiceAccountUserName', ServiceAccountUserName);
   end;
 end;
 
-function GetDownloadFileName(): string;
-var
-  ProcArch: string;
-begin
-  result := '';
-  case ProcessorArchitecture() of
-    paX86, paUnknown: ProcArch := '386';
-    paX64: ProcArch := 'amd64';
-    paArm64: ProcArch := 'arm64';
-  else
-    exit;
-  end;
-  result := Format('{#ZipfileNamePattern}', [ProcArch, LatestVersionTag]);
-end;
-
-function GetDownloadURL(const DownloadFileName: string): string;
-begin
-  result := '';
-  if LatestVersionTag = '' then
-    exit;
-  result := Format('{#GitHubDownloadURLPattern}', ['{#GitHubUserName}',
-    '{#GitHubProjectName}', LatestVersionTag, DownloadFileName]);
-end;
-
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   result := false;
   if PageID = FilePage0.ID then
-  begin
-    // Skip zip file page if we were able to get latest version tag
-    result := LatestVersionTag <> '';
-  end;
+    result := SkipZipFilePage;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
   UpgradeInterval, Port: Integer;
-  Relays, DownloadFileName, DownloadURL, Msg: string;
+  Relays: string;
 begin
   result := true;
   if CurPageID = FilePage0.ID then
@@ -701,6 +703,9 @@ begin
     end;
     // Update global based on page
     ZipFilePath := Trim(FilePage0.Values[0]);
+    UsingBundledZip := false;
+    BundledZipFileName := '';
+    SkipZipFilePage := true;
   end
   else if CurPageID = ConfigPage0.ID then
   begin
@@ -767,48 +772,9 @@ begin
     end;
     // Update global based on page
     RelaysEnabled := Relays;
-  end
-  else if CurPageID = wpReady then
-  begin
-    // No need to download if we already have zip file path
-    if ZipFilePath <> '' then
-      exit;
-    DownloadFileName := GetDownloadFileName();
-    DownloadURL := GetDownloadURL(DownloadFileName);
-    DownloadPage0.Clear();
-    DownloadPage0.Add(DownloadURL, DownloadFileName, '');
-    DownloadPage0.Show();
-    try
-      try
-        DownloadPage0.Download();
-      except
-        result := false;
-        if DownloadPage0.AbortedByUser then
-          Msg := CustomMessage('DownloadPageAbortedByUser')
-        else
-          Msg := AddPeriod(GetExceptionMessage);
-        if not WizardSilent() then
-          Msgbox(Msg, mbCriticalError, MB_OK)
-        else
-          Log(Msg);
-      end;
-    finally
-      DownloadPage0.Hide();
-    end;
-    if result then
-    begin
-      ZipFilePath := ExpandConstant(Format('{tmp}\%s', [DownloadFileName]));
-      result := TestZipFile(ZipFilePath);
-      if not result then
-      begin
-        ZipFilePath := '';
-        Msg := CustomMessage('ZipFileNotValid');
-        Log(Msg);
-        if not WizardSilent() then
-          MsgBox(Msg, mbCriticalError, MB_OK);
-        exit;
-      end;
-    end;
+    //-------------------------------------------------------------------------
+    // 4 - Optional cloud drive URL
+    CloudURL := Trim(ConfigPage0.Values[4]);
   end;
 end;
 
@@ -818,19 +784,16 @@ var
   Info: string;
 begin
   Info := '';
-  if LatestVersionTag = '' then
-  begin
-    Info := Info + CustomMessage('ReadyMemoZipFileInfo') + NewLine + Space;
+  Info := Info + CustomMessage('ReadyMemoZipFileInfo') + NewLine + Space;
+  if UsingBundledZip then
+    Info := Info + FmtMessage(CustomMessage('ReadyMemoZipFileBundled'), [BundledZipFileName])
+  else
     Info := Info + ZipFilePath;
-  end;
   // Show installation mode
   if Info <> '' then
     Info := Info + NewLine + NewLine;
   Info := Info + CustomMessage('ReadyMemoInstallSettings') + NewLine + Space;
-  if LatestVersionTag <> '' then
-    Info := Info + FmtMessage(CustomMessage('ReadyMemoInstallOnline'), [LatestVersionTag])
-  else
-    Info := Info + CustomMessage('ReadyMemoInstallOffline');
+  Info := Info + CustomMessage('ReadyMemoInstallOffline');
   Info := Info + NewLine + Space;
   if IsAdminInstallMode() then
     Info := Info + CustomMessage('ReadyMemoInstallAdmin') + NewLine + Space
@@ -882,6 +845,11 @@ begin
     Info := Info + Space + CustomMessage('ReadyMemoConfigItem3Disabled')
   else
     Info := Info + Space + CustomMessage('ReadyMemoConfigItem3Enabled');
+  Info := Info + NewLine;
+  if CloudURL <> '' then
+    Info := Info + Space + FmtMessage(CustomMessage('ReadyMemoConfigItem4Set'), [CloudURL])
+  else
+    Info := Info + Space + CustomMessage('ReadyMemoConfigItem4Empty');
   if MemoTasksInfo <> '' then
   begin
     if Info <> '' then
@@ -1145,12 +1113,14 @@ begin
       begin
         Params := '/remove /silent';
       end;
-      ExecEx(ExpandConstant('{sys}\cscript.exe'), ExpandConstant('"{app}\{#ScriptNameSyncthingLogonTask}" ') + Params, true);
+      ExecEx(ExpandConstant('{sys}\cscript.exe'),
+        ExpandConstant('"{app}\{#ScriptNameSyncthingLogonTask}" ') + GetLogonTaskParameters(Params),
+        true);
     end;
     SetupConfiguration();
     if WizardIsTaskSelected('startafterinstall') then
     begin
-      ExecEx(ExpandConstant('{app}\stctl.exe'), '--start -q', true);
+      ExecEx(ExpandConstant('{app}\stctl.exe'), GetStartSyncthingParameters(true), true);
     end
     else if WizardIsTaskSelected('startserviceafterinstall') then
     begin

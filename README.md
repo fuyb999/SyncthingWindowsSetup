@@ -67,7 +67,7 @@ https://github.com/Bill-Stewart/SyncthingWindowsSetup/releases/latest/
 
 Syncthing Windows Setup (herein referred to as "Setup") provides a [Syncthing](https://syncthing.net/) installer for Windows, built using [Inno Setup](https://www.jrsoftware.org/isinfo.php). It provides the following features:
 
-* Downloads and installs the latest version of Syncthing from GitHub
+* Uses a bundled or user-specified offline Syncthing zip package without downloading files during installation
 
 * Supports offline installation for Windows-based computers that can't connect to GitHub (see [Offline Installation](#offline-installation))
 
@@ -95,7 +95,7 @@ Administrative installations in versions 1.19.1 and older configured the Windows
 
 If you upgrade an administrative installation from version 1.19.1 or older, Setup version 1.27.0 and newer will uninstall the old version and install the new version, but it will no longer migrate the configuration data. Because of this change, it is recommended to first upgrade to version 1.26.1 to migrate the configuration data, and then upgrade again to version 1.27.0 or later.
 
-Starting in version 1.27.11, Setup automatically downloads and installs the latest version of Syncthing for Windows from GitHub. If Setup can't connect to GitHub, you must perform an offline installation (see [Offline Installation](#offline-installation)).
+This project is configured for offline installation. Setup uses a bundled Syncthing zip file that matches the target architecture, or a zip file specified manually (see [Offline Installation](#offline-installation)).
 
 ## Downgrading an Installation
 
@@ -166,6 +166,7 @@ Parameter                            | Description
 `/listenaddress=`_address_           | **[*]** Specifies the listen address for the web GUI configuration page. The default listen address is **127.0.0.1**.
 `/listenport=`_port_                 | **[*]** Specifies the TCP port number for the web GUI configuration page. The default port number is **8384**.
 `/relaysenabled=`_value_             | **[*]** Specifies whether relays are enabled (_value_ must be either **true** or **false**). The default value is **true** (i.e., relays are enabled).
+`/cloudurl="`_address_`"`            | **[*]** Specifies an optional cloud drive address. Setup appends this value to the current-user start shortcut or logon task as a forwarded Syncthing parameter: `stctl.exe --start -- --cloud-url "<address>"`.
 `/serviceaccountusername=`_username_ | For administrative installation mode, specifies the local service user account user name. The default user name is **SyncthingServiceAcct**.
 `/noconfigpage`                      | Prevents the **Open Syncthing configuration page** checkbox from appearing on the final Setup wizard page.
 `/zipfilepath="`_filename_`"`        | Specifies the path and filename of the zip file Setup uses to extract the Syncthing files (see [Offline Installation](#offline-installation)).
@@ -182,7 +183,13 @@ Please note the following:
 
 ## Offline Installation
 
-For Windows-based computers that are unable to download files from GitHub using https, Setup supports offline installation. To facilitate offline installation, you must download the zip file for the Windows version of Syncthing from a separate computer that can connect to GitHub. You can download the latest version of the zip file from the Syncthing project's **Releases** page:
+Setup supports offline installation only. To bundle Syncthing into Setup, place the Windows zip file in the repository's `offline` folder and rename it to one of the following filenames so that it matches the target architecture:
+
+* `syncthing-windows-amd64.zip`
+* `syncthing-windows-386.zip`
+* `syncthing-windows-arm64.zip`
+
+If you prefer not to bundle the file into Setup, you can still download the Windows zip from the Syncthing project's **Releases** page:
 
 https://github.com/syncthing/syncthing/releases/latest
 
@@ -206,9 +213,11 @@ Once you have the zip file, you can specify it for Setup by doing one of the fol
 
 Please note the following behaviors:
 
-* If Setup can't connect to GitHub to retrieve the latest Syncthing version information, it will assume an offline installation and display the **Select Installation Zip File** wizard page.
+* If you specify the **/zipfilepath** parameter, Setup will use that file first.
 
-* If you specify the **/zipfilepath** parameter, Setup will not attempt to connect to GetHub to retrieve Syncthing version information or download the latest installation zip file.
+* If you do not specify **/zipfilepath**, Setup will try to use a bundled zip file that matches the current architecture.
+
+* If neither of the above is available, Setup will display the **Select Installation Zip File** wizard page and prompt for a local zip file.
 
 ## Non Administrative vs. Administrative Installation Mode
 

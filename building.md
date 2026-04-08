@@ -18,10 +18,10 @@ The following table lists all of the files associated with Syncthing Windows Set
 | _lang_`-License.rtf`       | License information shown on the **License** page of the installer wizard
 | _lang_`-README.rtf`        | README information shown on the **Information** page of the installer wizard
 | _lang_`-`_scriptname_`.js` | Setup installs one or more of these WSH scripts on the user's system
-| `jq.exe`                   | 32-bit [jq](https://jqlang.github.io/jq/) tool (used during installation only)
 | `LICENSE`                  | License agreement
 | `Localization.ini`         | Facilitates localization of the script files (see [Localization](#localization))
 | `Messages-`_lang_`.isl`    | Setup messages file (see [Localization](#localization))
+| `offline`                  | Folder contains the bundled offline Syncthing zip files
 | `ProcessCheck.dll`         | 32-bit [ProcessCheck](https://github.com/Bill-Stewart/ProcessCheck) DLL (used during installation only)
 | `README.md`                | Setup documentation
 | `SetupVersion.ini`         | Setup version file
@@ -43,9 +43,21 @@ The following table lists all of the files associated with Syncthing Windows Set
 
 3. Put the 32-bit binaries in the `binaries\i386` folder and the 64-bit binaries in the `binaries\x86_64` folder.
 
+4. Put the offline Syncthing zip files you want to bundle into the `offline` folder using these exact filenames:
+
+   * `syncthing-windows-386.zip`
+   * `syncthing-windows-amd64.zip`
+   * `syncthing-windows-arm64.zip`
+
 ## Build Setup
 
-Use whatever method you prefer to compile `Syncthing.iss` using Inno Setup. The output filename will be `syncthing-windows-setup.exe`.
+Use whatever method you prefer to compile `Syncthing.iss` using Inno Setup 6.3.3 or later. The output filename will be `syncthing-windows-setup.exe`.
+
+The installer no longer downloads Syncthing during installation. It will use resources in this order:
+
+1. `/zipfilepath=...` if specified
+2. A bundled zip file from the `offline` folder that matches the target architecture
+3. A zip file selected manually on the **Select Installation Zip File** page
 
 ## Localization Steps
 
