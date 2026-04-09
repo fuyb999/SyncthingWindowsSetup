@@ -27,6 +27,8 @@ ShortcutNameConfigurationPage=Syncthing 配置页面
 ShortcutNameConfigurationPageComment=打开 Syncthing 配置网页。
 ShortcutNameStartSyncthing=启动 Syncthing
 ShortcutNameStartSyncthingComment=启动 Syncthing。
+ShortcutNameRestartSyncthing=重启 Syncthing
+ShortcutNameRestartSyncthingComment=重启 Syncthing。
 ShortcutNameStopSyncthing=停止 Syncthing
 ShortcutNameStopSyncthingComment=停止 Syncthing。
 ; [Tasks]
@@ -35,7 +37,7 @@ TasksStartServiceAfterInstall=安装完成后启动 Syncthing 服务(&I)
 TasksStartAtLogon=登录时自动启动 Syncthing(&A)
 TasksStartAtLogon_ACPowerOnly=仅在计算机接通交流电时自动启动(&T)
 TasksStartAfterInstall=安装完成后启动 Syncthing(&I)
-TasksCreateDesktopIcon=为 Syncthing 配置页面创建桌面快捷方式(&D)
+TasksCreateDesktopIcon=为 Syncthing 创建桌面快捷方式(&D)
 ; [Run]
 RunStatusMsg=正在完成安装任务...
 RunPostInstallOpenConfigPage=打开 Syncthing 配置页面(&O)

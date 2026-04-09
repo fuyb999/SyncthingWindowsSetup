@@ -27,6 +27,8 @@ ShortcutNameConfigurationPage=Syncthing Configuration Page
 ShortcutNameConfigurationPageComment=Opens the Syncthing configuration web page.
 ShortcutNameStartSyncthing=Start Syncthing
 ShortcutNameStartSyncthingComment=Starts Syncthing.
+ShortcutNameRestartSyncthing=Restart Syncthing
+ShortcutNameRestartSyncthingComment=Restarts Syncthing.
 ShortcutNameStopSyncthing=Stop Syncthing
 ShortcutNameStopSyncthingComment=Stops Syncthing.
 ; [Tasks]
@@ -35,7 +37,7 @@ TasksStartServiceAfterInstall=Start Syncthing service after &installation
 TasksStartAtLogon=Start Syncthing &automatically when logging on
 TasksStartAtLogon_ACPowerOnly=S&tart automatically only if the computer is running AC power
 TasksStartAfterInstall=Start Syncthing after &installation
-TasksCreateDesktopIcon=Create &desktop shortcut for Syncthing configuration page
+TasksCreateDesktopIcon=Create &desktop shortcuts for Syncthing
 ; [Run]
 RunStatusMsg=Completing setup tasks...
 RunPostInstallOpenConfigPage=&Open Syncthing configuration page

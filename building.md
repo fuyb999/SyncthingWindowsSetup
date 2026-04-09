@@ -15,8 +15,6 @@ The following table lists all of the files associated with Syncthing Windows Set
 | --------------             | -----------
 | `binaries`                 | Folder contains 32-bit (i386) and 64-bit (x86_64) binaries
 | `building.md`              | This file
-| _lang_`-License.rtf`       | License information shown on the **License** page of the installer wizard
-| _lang_`-README.rtf`        | README information shown on the **Information** page of the installer wizard
 | _lang_`-`_scriptname_`.js` | Setup installs one or more of these WSH scripts on the user's system
 | `LICENSE`                  | License agreement
 | `Localization.ini`         | Facilitates localization of the script files (see [Localization](#localization))
@@ -53,6 +51,10 @@ The following table lists all of the files associated with Syncthing Windows Set
 
 Use whatever method you prefer to compile `Syncthing.iss` using Inno Setup 6.3.3 or later. The output filename will be `syncthing-windows-setup.exe`.
 
+The repository includes `ChineseSimplified.isl` locally because the Simplified Chinese language file is not always present in the default Inno Setup installation.
+
+The local `sthttpscert.exe` helper should be built with a Windows 7 compatible Go toolchain. `scripts/download-build-assets.sh` does this by default using `GOTOOLCHAIN=go1.20.14`.
+
 The installer no longer downloads Syncthing during installation. It will use resources in this order:
 
 1. `/zipfilepath=...` if specified
@@ -67,23 +69,19 @@ To add additional language support to Setup, do the following:
 
 2.  Update the strings in `Messages-`_lang_`.isl` for the language.
 
-3.  Provide a translated copy of the license in Rich Text Format (RTF) as _lang_`-License.rtf`.
+3.  Update the `[Languages]` section in the `Syncthing.iss` file.
 
-4.  Provide a translated copy of the "README" file in RTF as _lang_`-README.rtf`.
+4.  Copy each `en-`_scriptname_`.js` script to _lang_`-`_scriptname_`.js` (where _lang_ is the language you want to add).
 
-5.  Update the `[Languages]` section in the `Syncthing.iss` file.
-
-6.  Copy each `en-`_scriptname_`.js` script to _lang_`-`_scriptname_`.js` (where _lang_ is the language you want to add).
-
-7.  Edit the messages at the top of each _lang_`-`_scriptname_`.js` script such that the messages are appropriate for the language.
+5.  Edit the messages at the top of each _lang_`-`_scriptname_`.js` script such that the messages are appropriate for the language.
 
     > NOTE: If the messages do not display correctly when the scripts run, it may be an encoding problem. Try saving the scripts using UTF-16 LE (little endian) encoding.
 
-8.  In the `Localization.ini` file, add a section for the language, and specify the source file names you want to use for the language.
+6.  In the `Localization.ini` file, add a section for the language, and specify the source file names you want to use for the language.
 
-9.  Increment the `NumLanguages` preprocessor directive in `Syncthing.iss`.
+7.  Increment the `NumLanguages` preprocessor directive in `Syncthing.iss`.
 
-10. Add a language preprocessor directive to `Syncthing.iss`, using the following syntax:
+8. Add a language preprocessor directive to `Syncthing.iss`, using the following syntax:
 
      `#define Languages[`_index_`] "`_lang_`"`
 
@@ -97,37 +95,32 @@ The following steps describe how to add localization for Dutch (language code `n
 
 2.  Update the strings in `Messages-nl.isl` to Dutch.
 
-3.  Provide a Dutch-language copy of the license in Rich Text Format (RTF) as `nl-License.rtf`.
-
-4.  Provide a Dutch-language copy of the README in RTF as `nl-README.rtf`.
-
-5.  Add Dutch to the `[Languages]` section in `Syncthing.iss`; e.g.:
+3.  Add Dutch to the `[Languages]` section in `Syncthing.iss`; e.g.:
 
         [Languages]
-        Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"; InfoBeforeFile: "en-README.rtf"
-        Name: "nl"; MessagesFile: "compiler:Languages\Dutch.isl,Messages-nl.isl"; InfoBeforeFile: "nl-README.rtf"
+        Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"
+        Name: "nl"; MessagesFile: "compiler:Languages\Dutch.isl,Messages-nl.isl"
 
-6.  Copy the `en-`_scriptname_`.js` scripts to `nl-`_scriptname_`.js` files. PowerShell example:
+4.  Copy the `en-`_scriptname_`.js` scripts to `nl-`_scriptname_`.js` files. PowerShell example:
 
         Get-ChildItem en-*.js | ForEach-Object { Copy-Item $_ ($_.Name -replace '^en-','nl-') }
 
-7.  Update the messages at the top of each `nl-`_scriptname_`.js` script file to Dutch.
+5.  Update the messages at the top of each `nl-`_scriptname_`.js` script file to Dutch.
 
-8.  Add a section in `Localization.ini` for the Dutch language code (`nl`) and add the corresponding file names; e.g.:
+6.  Add a section in `Localization.ini` for the Dutch language code (`nl`) and add the corresponding file names; e.g.:
 
         [nl]
-        LicenseFile=nl-License.rtf
         ScriptNameSetSyncthingConfig=nl-SetSyncthingConfig.js
         ScriptNameSyncthingFirewallRule=nl-SyncthingFirewallRule.js
         ScriptNameSyncthingLogonTask=nl-SyncthingLogonTask.js
 
-9.  Increment the `NumLanguages` preprocessor directive in `Syncthing.iss`; e.g.:
+7.  Increment the `NumLanguages` preprocessor directive in `Syncthing.iss`; e.g.:
 
         ...
         #define NumLanguages 2
         ...
 
-10. Also in `Syncthing.iss`, add Dutch to the `Languages` preprocessor directive array using the next higher index; e.g.:
+8. Also in `Syncthing.iss`, add Dutch to the `Languages` preprocessor directive array using the next higher index; e.g.:
 
         ...
         #define Languages[0] "en"

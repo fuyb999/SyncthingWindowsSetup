@@ -15,6 +15,10 @@ Required files:
 - `ErrInfo.exe`
 - `ServMan.exe`
 - `shawl.exe`
+- `sthttpscert.exe`
 - `stctl.exe`
+
+`sthttpscert.exe` is built locally from `tools/sthttpscert/main.go` by `scripts/download-build-assets.sh`.
+By default the script uses `GOTOOLCHAIN=go1.20.14` so the generated Windows helper remains compatible with Windows 7.
 
 The installer packages these files from the local repository. They are no longer expected to be fetched during installation.

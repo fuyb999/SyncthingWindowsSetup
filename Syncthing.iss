@@ -22,17 +22,38 @@
 #define ServiceShutdownTimeout "10000"
 #define DefaultAutoUpgradeInterval "12"
 #define DefaultListenAddress "127.0.0.1"
-#define DefaultListenPort "8384"
-#define DefaultRelaysEnabled "true"
+#define DefaultListenPort "18384"
 #define DefaultServiceAccountUserName "SyncthingServiceAcct"
 #define ConfigurationPageName "ConfigurationPage"
-#define LicenseFileName "License.rtf"
+#define ScriptNameRestartSyncthing "RestartSyncthing.js"
 #define ScriptNameSetSyncthingConfig "SetSyncthingConfig.js"
 #define ScriptNameSyncthingFirewallRule "SyncthingFirewallRule.js"
 #define ScriptNameSyncthingLogonTask "SyncthingLogonTask.js"
+#define HttpsCertToolName "sthttpscert.exe"
+#define HttpsCaCertFileName "syncthing-local-ca-cert.pem"
+#define HttpsCaKeyFileName "syncthing-local-ca-key.pem"
 #define OfflineZipNameX86 "syncthing-windows-386.zip"
 #define OfflineZipNameX64 "syncthing-windows-amd64.zip"
 #define OfflineZipNameArm64 "syncthing-windows-arm64.zip"
+#define OfflineDir AddBackslash(AddBackslash(SourcePath) + "offline")
+#define HaveOfflineZipX86 FileExists(OfflineDir + OfflineZipNameX86)
+#define HaveOfflineZipX64 FileExists(OfflineDir + OfflineZipNameX64)
+#define HaveOfflineZipArm64 FileExists(OfflineDir + OfflineZipNameArm64)
+#if HaveOfflineZipX86
+  #define BundledZipNameForX86 OfflineZipNameX86
+#else
+  #define BundledZipNameForX86 ""
+#endif
+#if HaveOfflineZipX64
+  #define BundledZipNameForX64 OfflineZipNameX64
+#else
+  #define BundledZipNameForX64 ""
+#endif
+#if HaveOfflineZipArm64
+  #define BundledZipNameForArm64 OfflineZipNameArm64
+#else
+  #define BundledZipNameForArm64 ""
+#endif
 #define DefaultCloudURL ""
 
 [Setup]
@@ -43,7 +64,7 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-MinVersion=10
+MinVersion=6.1
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=no
 CloseApplicationsFilter=*.exe
@@ -77,15 +98,15 @@ VersionInfoVersion={#SetupVersion}
 SetupWindowTitle=Syncthing Windows Setup
 
 [Languages]
-Name: "zh-Hans"; MessagesFile: "compiler:Languages\ChineseSimplified.isl,Messages-zh-Hans.isl"; InfoBeforeFile: "zh-Hans-README.rtf"
-Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"; InfoBeforeFile: "en-README.rtf"
+Name: "zhHans"; MessagesFile: "ChineseSimplified.isl,Messages-zh-Hans.isl"
+Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"
 
 ; See building.md file for localization details
 #define protected
 #define LocalizationFile AddBackslash(SourcePath) + "Localization.ini"
 #define NumLanguages 2
 #dim    Languages[NumLanguages]
-#define Languages[0] "zh-Hans"
+#define Languages[0] "zhHans"
 #define Languages[1] "en"
 
 [Files]
@@ -93,11 +114,9 @@ Name: "en"; MessagesFile: "compiler:Default.isl,Messages-en.isl"; InfoBeforeFile
 #define i 0
 #sub LocalizeFiles
 #define Language Languages[i]
-#define FileNameLicense        ReadIni(LocalizationFile, Language, "LicenseFile")
 #define ScriptNameSetConfig    ReadIni(LocalizationFile, Language, "ScriptNameSetSyncthingConfig")
 #define ScriptNameFirewallRule ReadIni(LocalizationFile, Language, "ScriptNameSyncthingFirewallRule")
 #define ScriptNameLogonTask    ReadIni(LocalizationFile, Language, "ScriptNameSyncthingLogonTask")
-Source: "{#FileNameLicense}"; DestName: "{#LicenseFileName}"; flags: dontcopy
 Source: "{#ScriptNameFirewallRule}"; DestDir: "{app}"; DestName: "{#ScriptNameSyncthingFirewallRule}"; Languages: "{#Language}"
 Source: "{#ScriptNameSetConfig}"; DestDir: "{app}"; DestName: "{#ScriptNameSetSyncthingConfig}"; Languages: "{#Language}"
 Source: "{#ScriptNameLogonTask}"; DestDir: "{app}"; DestName: "{#ScriptNameSyncthingLogonTask}"; Languages: "{#Language}"; Check: not IsAdminInstallMode()
@@ -111,6 +130,13 @@ Source: "UninsIS.dll"; Flags: dontcopy
 Source: "ProcessCheck.dll"; Flags: dontcopy
 ; unzip utility for validating and extracting Syncthing
 Source: "unzip.exe"; Flags: dontcopy
+; current-user restart helper
+Source: "{#ScriptNameRestartSyncthing}"; DestDir: "{app}"; Check: not IsAdminInstallMode()
+; GUI HTTPS certificate signing
+Source: "certs\{#HttpsCaCertFileName}"; DestName: "{#HttpsCaCertFileName}"; Flags: dontcopy
+Source: "certs\{#HttpsCaKeyFileName}"; DestName: "{#HttpsCaKeyFileName}"; Flags: dontcopy
+Source: "binaries\i386\{#HttpsCertToolName}"; DestName: "{#HttpsCertToolName}"; Flags: dontcopy; Check: not IsX64Compatible()
+Source: "binaries\x86_64\{#HttpsCertToolName}"; DestName: "{#HttpsCertToolName}"; Flags: dontcopy; Check: IsX64Compatible()
 ; Bundled offline installation zip files
 Source: "offline\{#OfflineZipNameX86}"; Flags: dontcopy skipifsourcedoesntexist
 Source: "offline\{#OfflineZipNameX64}"; Flags: dontcopy skipifsourcedoesntexist
@@ -161,6 +187,17 @@ Name: "{group}\{cm:ShortcutNameStartSyncthing}"; \
   Parameters: "{code:GetStartShortcutParameters}"; \
   Comment: "{cm:ShortcutNameStartSyncthingComment}"; \
   Check: not IsAdminInstallMode()
+Name: "{group}\{cm:ShortcutNameRestartSyncthing}"; \
+  Filename: "{sys}\wscript.exe"; \
+  Parameters: """{app}\{#ScriptNameRestartSyncthing}"" {code:GetRestartShortcutParameters}"; \
+  Comment: "{cm:ShortcutNameRestartSyncthingComment}"; \
+  Check: not IsAdminInstallMode()
+Name: "{autodesktop}\{cm:ShortcutNameRestartSyncthing}"; \
+  Filename: "{sys}\wscript.exe"; \
+  Parameters: """{app}\{#ScriptNameRestartSyncthing}"" {code:GetRestartShortcutParameters}"; \
+  Comment: "{cm:ShortcutNameRestartSyncthingComment}"; \
+  Tasks: desktopicon; \
+  Check: not IsAdminInstallMode()
 Name: "{group}\{cm:ShortcutNameStopSyncthing}"; \
   Filename: "{app}\stctl.exe"; \
   Parameters: "--stop"; \
@@ -171,7 +208,7 @@ Name: "{group}\{cm:ShortcutNameStopSyncthing}"; \
 Filename: "{app}\{#ConfigurationPageName}.url"; \
   Section: "InternetShortcut"; \
   Key: "URL"; \
-  String: "https://{code:GetListenAddress}:{code:GetListenPort}"
+  String: "{code:GetConfigurationPageURL}"
 Filename: "{app}\{#ConfigurationPageName}.url"; \
   Section: "InternetShortcut"; \
   Key: "IconFile"; \
@@ -202,8 +239,7 @@ Name: startafterinstall; \
   Description: "{cm:TasksStartAfterInstall}"; \
   Check: not IsAdminInstallMode()
 Name: desktopicon; \
-  Description: "{cm:TasksCreateDesktopIcon}"; \
-  Flags: unchecked
+  Description: "{cm:TasksCreateDesktopIcon}"
 
 [Run]
 ; Admin: Add firewall rule silently
@@ -221,7 +257,7 @@ Filename: "{sys}\wscript.exe"; \
 Filename: "{app}\{#ConfigurationPageName}.url"; \
   Description: "{cm:RunPostInstallOpenConfigPage}"; \
   Flags: shellexec postinstall skipifsilent; \
-  Check: ShowPostInstallCheckbox() and IsSyncthingRunning()
+  Check: ShouldOpenConfigPagePostInstall()
 
 [UninstallRun]
 ; Admin: remove firewall rule
@@ -265,11 +301,10 @@ type
 
 // Global variables
 var
-  OutputMsgMemoPage0: TOutputMsgMemoWizardPage;
   ConfigPage0: TInputQueryWizardPage;
   FilePage0: TInputFileWizardPage;
   // Configuration page values
-  AutoUpgradeInterval, ListenAddress, ListenPort, RelaysEnabled, CloudURL: string;
+  AutoUpgradeInterval, ListenAddress, ListenPort, CloudURL: string;
   ServiceAccountUserName, ExecOutputFirstLine, ZipFilePath, BundledZipFileName: string;
   SkipZipFilePage, UsingBundledZip: Boolean;
 
@@ -391,6 +426,14 @@ begin
   result := not ParamStrExists('/noconfigpage');
 end;
 
+function ShouldOpenConfigPagePostInstall(): Boolean;
+begin
+  result := ShowPostInstallCheckbox() and
+    (((not IsAdminInstallMode()) and WizardIsTaskSelected('startafterinstall')) or
+     (IsAdminInstallMode() and WizardIsTaskSelected('startserviceafterinstall')) or
+     IsSyncthingRunning());
+end;
+
 function IsDomainController(): Boolean;
 var
   VersionInfo: TWindowsVersion;
@@ -447,9 +490,9 @@ function GetBundledZipFileName(): string;
 begin
   result := '';
   case ProcessorArchitecture() of
-    paX86, paUnknown: result := '{#OfflineZipNameX86}';
-    paX64: result := '{#OfflineZipNameX64}';
-    paArm64: result := '{#OfflineZipNameArm64}';
+    paX86, paUnknown: result := '{#BundledZipNameForX86}';
+    paX64: result := '{#BundledZipNameForX64}';
+    paArm64: result := '{#BundledZipNameForArm64}';
   end;
 end;
 
@@ -499,6 +542,14 @@ end;
 function GetStartShortcutParameters(Param: string): string;
 begin
   result := GetStartSyncthingParameters(false);
+end;
+
+// Param parameter is required
+function GetRestartShortcutParameters(Param: string): string;
+begin
+  result := '/lang:' + QuoteValue(ActiveLanguage());
+  if Trim(CloudURL) <> '' then
+    result := result + ' /cloudurl:' + QuoteValue(CloudURL);
 end;
 
 function GetLogonTaskParameters(const BaseParams: string): string;
@@ -554,8 +605,6 @@ begin
     Trim(ExpandConstant('{param:listenaddress|{#DefaultListenAddress}}')));
   ListenPort := GetPreviousData('ListenPort',
     Trim(ExpandConstant('{param:listenport|{#DefaultListenPort}}')));
-  RelaysEnabled := GetPreviousData('RelaysEnabled',
-    Trim(ExpandConstant('{param:relaysenabled|{#DefaultRelaysEnabled}}')));
   CloudURL := GetPreviousData('CloudURL',
     Trim(ExpandConstant('{param:cloudurl|{#DefaultCloudURL}}')));
   ExtractTemporaryFile('unzip.exe');
@@ -575,7 +624,7 @@ begin
         SkipZipFilePage := true
       else
         Log(CustomMessage('ZipFileNotValid'));
-    end;
+    end
     else
       Log(CustomMessage('ZipFilePathNotFound'));
   end
@@ -591,27 +640,9 @@ begin
 end;
 
 procedure InitializeWizard();
-var
-  LicenseOK: Boolean;
-  PageID: Integer;
-  LicenseFileText: AnsiString;
 begin
-  // Custom memo page(s)
-  ExtractTemporaryFile('{#LicenseFileName}');
-  LicenseOK := LoadStringFromFile(ExpandConstant('{tmp}\{#LicenseFileName}'), LicenseFileText);
-  if LicenseOK then
-  begin
-    OutputMsgMemoPage0 := CreateOutputMsgMemoPage(wpInfoBefore,
-      CustomMessage('MemoPage0Caption'),
-      CustomMessage('MemoPage0Description'),
-      CustomMessage('MemoPage0SubCaption'),
-      LicenseFileText);
-    PageID := OutputMsgMemoPage0.ID;
-  end
-  else
-    PageID := wpInfoBefore;
   // Custom file page(s)
-  FilePage0 := CreateInputFilePage(PageID,
+  FilePage0 := CreateInputFilePage(wpWelcome,
     CustomMessage('FilePage0Caption'),
     CustomMessage('FilePage0Description'),
     CustomMessage('FilePage0SubCaption'));
@@ -626,13 +657,11 @@ begin
   ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item0'), ['{#DefaultAutoUpgradeInterval}']), false);
   ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item1'), ['{#DefaultListenAddress}']), false);
   ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item2'), ['{#DefaultListenPort}']), false);
-  ConfigPage0.Add(FmtMessage(CustomMessage('ConfigPage0Item3'), ['{#DefaultRelaysEnabled}']), false);
   ConfigPage0.Add(CustomMessage('ConfigPage0Item4'), false);
   ConfigPage0.Values[0] := AutoUpgradeInterval;
   ConfigPage0.Values[1] := ListenAddress;
   ConfigPage0.Values[2] := ListenPort;
-  ConfigPage0.Values[3] := RelaysEnabled;
-  ConfigPage0.Values[4] := CloudURL;
+  ConfigPage0.Values[3] := CloudURL;
 end;
 
 function InitializeUninstall(): Boolean;
@@ -649,7 +678,6 @@ begin
   SetPreviousData(PreviousDataKey, 'AutoUpgradeInterval', AutoUpgradeInterval);
   SetPreviousData(PreviousDataKey, 'ListenAddress', ListenAddress);
   SetPreviousData(PreviousDataKey, 'ListenPort', ListenPort);
-  SetPreviousData(PreviousDataKey, 'RelaysEnabled', RelaysEnabled);
   SetPreviousData(PreviousDataKey, 'CloudURL', CloudURL);
   if IsAdminInstallMode() then
   begin
@@ -667,7 +695,6 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
   UpgradeInterval, Port: Integer;
-  Relays: string;
 begin
   result := true;
   if CurPageID = FilePage0.ID then
@@ -757,24 +784,8 @@ begin
     // Update global based on page
     ListenPort := Trim(ConfigPage0.Values[2]);
     //-------------------------------------------------------------------------
-    // 3 - Validate relays enabled ('true' or 'false')
-    Relays := Lowercase(Trim(ConfigPage0.Values[3]));
-    result := (Relays = 'false') or (Relays = 'true');
-    if not result then
-    begin
-      Log(CustomMessage('ConfigPage0Item3NotValid'));
-      if not WizardSilent() then
-        MsgBox(CustomMessage('ConfigPage0Item3NotValid'), mbError, MB_OK);
-      WizardForm.ActiveControl := ConfigPage0.Edits[3];
-      ConfigPage0.Values[3] := '{#DefaultRelaysEnabled}';
-      ConfigPage0.Edits[3].SelectAll();
-      exit;
-    end;
-    // Update global based on page
-    RelaysEnabled := Relays;
-    //-------------------------------------------------------------------------
-    // 4 - Optional cloud drive URL
-    CloudURL := Trim(ConfigPage0.Values[4]);
+    // 3 - Optional cloud drive URL
+    CloudURL := Trim(ConfigPage0.Values[3]);
   end;
 end;
 
@@ -841,11 +852,6 @@ begin
   Info := Info + Space + CustomMessage('ReadyMemoConfigItem1') + ' ' + ListenAddress + NewLine
     + Space + CustomMessage('ReadyMemoConfigItem2') + ' ' + ListenPort;
   Info := Info + NewLine;
-  if RelaysEnabled = 'false' then
-    Info := Info + Space + CustomMessage('ReadyMemoConfigItem3Disabled')
-  else
-    Info := Info + Space + CustomMessage('ReadyMemoConfigItem3Enabled');
-  Info := Info + NewLine;
   if CloudURL <> '' then
     Info := Info + Space + FmtMessage(CustomMessage('ReadyMemoConfigItem4Set'), [CloudURL])
   else
@@ -872,6 +878,89 @@ end;
 function GetListenPort(Param: string): string;
 begin
   result := ListenPort;
+end;
+
+function IsUnreservedURLByte(const B: Byte): Boolean;
+begin
+  result := ((B >= Ord('A')) and (B <= Ord('Z'))) or
+    ((B >= Ord('a')) and (B <= Ord('z'))) or
+    ((B >= Ord('0')) and (B <= Ord('9'))) or
+    (B = Ord('-')) or (B = Ord('.')) or (B = Ord('_')) or (B = Ord('~'));
+end;
+
+function NibbleToHex(const N: Integer): Char;
+begin
+  if N < 10 then
+    result := Chr(Ord('0') + N)
+  else
+    result := Chr(Ord('A') + N - 10);
+end;
+
+function ByteToHex(const B: Integer): string;
+begin
+  result := NibbleToHex(B div 16) + NibbleToHex(B mod 16);
+end;
+
+function UrlEncode(const Value: string): string;
+var
+  I: Integer;
+  Bytes: AnsiString;
+  B: Integer;
+begin
+  Bytes := Utf8Encode(Value);
+  result := '';
+  for I := 1 to Length(Bytes) do
+  begin
+    B := Ord(Bytes[I]);
+    if IsUnreservedURLByte(B) then
+      result := result + Chr(B)
+    else
+      result := result + '%' + ByteToHex(B);
+  end;
+end;
+
+// Param parameter is required
+function GetConfigurationPageURL(Param: string): string;
+begin
+  result := 'https://' + GetListenAddress('') + ':' + GetListenPort('');
+  if Trim(CloudURL) <> '' then
+    result := result + '?cloud-url=' + UrlEncode(CloudURL);
+end;
+
+function GetSyncthingConfigPath(): string;
+begin
+  if IsAdminInstallMode() then
+    result := ExpandConstant('{commonappdata}\{#AppName}')
+  else
+    result := ExpandConstant('{localappdata}\{#AppName}');
+end;
+
+function GenerateGuiHttpsCertificate(): Integer;
+var
+  FileName, Params: string;
+begin
+  ExtractTemporaryFile('{#HttpsCertToolName}');
+  ExtractTemporaryFile('{#HttpsCaCertFileName}');
+  ExtractTemporaryFile('{#HttpsCaKeyFileName}');
+  FileName := ExpandConstant('{tmp}\{#HttpsCertToolName}');
+  Params := '--config-dir "' + GetSyncthingConfigPath() + '"'
+    + ' --listen-address "' + ListenAddress + '"'
+    + ' --ca-cert "' + ExpandConstant('{tmp}\{#HttpsCaCertFileName}') + '"'
+    + ' --ca-key "' + ExpandConstant('{tmp}\{#HttpsCaKeyFileName}') + '"';
+  result := ExecEx(FileName, Params, true);
+end;
+
+function ImportRootCaCertificate(): Integer;
+var
+  FileName, Params: string;
+begin
+  ExtractTemporaryFile('{#HttpsCaCertFileName}');
+  FileName := ExpandConstant('{sys}\certutil.exe');
+  if IsAdminInstallMode() then
+    Params := '-f -addstore Root "' + ExpandConstant('{tmp}\{#HttpsCaCertFileName}') + '"'
+  else
+    Params := '-user -f -addstore Root "' + ExpandConstant('{tmp}\{#HttpsCaCertFileName}') + '"';
+  result := ExecEx(FileName, Params, true);
 end;
 
 // Param parameter is required
@@ -1009,8 +1098,7 @@ begin
   else
     Params := Params + ' /currentuser';
   Params := Params + ' /autoupgradeinterval:' + AutoUpgradeInterval
-    + ' /guiaddress:"' + ListenAddress + ':' + ListenPort + '"'
-    + ' /relaysenabled:' + RelaysEnabled;
+    + ' /guiaddress:"' + ListenAddress + ':' + ListenPort + '"';
   if WizardSilent() then
     Params := Params + ' /silent';
   result := ExecEx(FileName, Params, true);
@@ -1118,6 +1206,10 @@ begin
         true);
     end;
     SetupConfiguration();
+    if GenerateGuiHttpsCertificate() <> 0 then
+      Log('Failed to generate GUI HTTPS certificate; leaving existing Syncthing HTTPS certificate in place');
+    if ImportRootCaCertificate() <> 0 then
+      Log('Failed to import Syncthing GUI root certificate into the Windows trust store');
     if WizardIsTaskSelected('startafterinstall') then
     begin
       ExecEx(ExpandConstant('{app}\stctl.exe'), GetStartSyncthingParameters(true), true);
@@ -1130,6 +1222,14 @@ begin
     if not WizardIsTaskSelected('desktopicon') then
     begin
       FileName := ExpandConstant('{autodesktop}\{cm:ShortcutNameConfigurationPage}.lnk');
+      if FileExists(FileName) then
+      begin
+        if DeleteFile(FileName) then
+          Log(FmtMessage(CustomMessage('FileDeleteSucceeded'), [FileName]))
+        else
+          Log(FmtMessage(CustomMessage('FileDeleteFailed'), [FileName]));
+      end;
+      FileName := ExpandConstant('{autodesktop}\{cm:ShortcutNameRestartSyncthing}.lnk');
       if FileExists(FileName) then
       begin
         if DeleteFile(FileName) then

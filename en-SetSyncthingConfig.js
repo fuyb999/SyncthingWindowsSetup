@@ -92,13 +92,6 @@ function paramIsEmpty(paramName) {
   return (Args.Named.Item(paramName) == "") || (Args.Named.Item(paramName) == null);
 }
 
-function getBoolStringParam(paramName) {
-  if ( paramIsEmpty(paramName) ) {
-    return "false";
-  }
-  return Args.Named.Item(paramName).toLowerCase() == "true" ? "true" : "false";
-}
-
 function main() {
   // Following depend on /currentuser or /service parameter
   var configPath = null;      // Syncthing config file path
@@ -163,12 +156,20 @@ function main() {
   var configValue = null;
   try {
     XMLDOMDocument.load(configFileName);
+    // Force GUI HTTPS
+    xmlElement = XMLDOMDocument.selectSingleNode("//configuration/gui");
+    configValue = xmlElement.getAttribute("tls");
+    if ( (configValue == null) || (configValue == "") ||
+      (String(configValue).toLowerCase() != "true") ) {
+      xmlElement.setAttribute("tls","true");
+      XMLDOMDocument.save(configFileName);
+    }
     // Configure GUI address
     if ( Args.Named.Exists("guiaddress") ) {
       xmlElement = XMLDOMDocument.selectSingleNode("//configuration/gui/address");
       configValue = Args.Named.Item("guiaddress");
       if ( xmlElement.text != configValue ) {
-        xmlElement.text = paramIsEmpty("guiaddress") ? "127.0.0.1:8384" : configValue;
+        xmlElement.text = paramIsEmpty("guiaddress") ? "127.0.0.1:18384" : configValue;
         XMLDOMDocument.save(configFileName);
       }
     }
@@ -179,14 +180,11 @@ function main() {
       xmlElement.text = paramIsEmpty("autoupgradeinterval") ? "12" : configValue;
       XMLDOMDocument.save(configFileName);
     }
-    // Configure relaysEnabled
-    if ( Args.Named.Exists("relaysenabled") ) {
-      xmlElement = XMLDOMDocument.selectSingleNode("//configuration/options/relaysEnabled");
-      configValue = getBoolStringParam("relaysenabled");
-      if ( xmlElement.text != configValue ) {
-        xmlElement.text = configValue;
-        XMLDOMDocument.save(configFileName);
-      }
+    // Force relaysEnabled off
+    xmlElement = XMLDOMDocument.selectSingleNode("//configuration/options/relaysEnabled");
+    if ( xmlElement.text.toLowerCase() != "false" ) {
+      xmlElement.text = "false";
+      XMLDOMDocument.save(configFileName);
     }
     // Configure setLowPriority
     xmlElement = XMLDOMDocument.selectSingleNode("//configuration/options/setLowPriority");

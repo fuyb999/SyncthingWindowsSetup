@@ -164,9 +164,8 @@ Parameter                            | Description
 ---------                            | -----------
 `/autoupgradeinterval=`_interval_    | **[*]** Specifies the number of hours that Syncthing should check for upgrades and automatically upgrade itself. The default value is 12 hours. Specify **0** to disable Syncthing's automatic upgrade feature.
 `/listenaddress=`_address_           | **[*]** Specifies the listen address for the web GUI configuration page. The default listen address is **127.0.0.1**.
-`/listenport=`_port_                 | **[*]** Specifies the TCP port number for the web GUI configuration page. The default port number is **8384**.
-`/relaysenabled=`_value_             | **[*]** Specifies whether relays are enabled (_value_ must be either **true** or **false**). The default value is **true** (i.e., relays are enabled).
-`/cloudurl="`_address_`"`            | **[*]** Specifies an optional cloud drive address. Setup appends this value to the current-user start shortcut or logon task as a forwarded Syncthing parameter: `stctl.exe --start -- --cloud-url "<address>"`.
+`/listenport=`_port_                 | **[*]** Specifies the TCP port number for the web GUI configuration page. The default port number is **18384**.
+`/cloudurl="`_address_`"`            | **[*]** Specifies an optional cloud drive address. Setup appends this value to the current-user start shortcut or logon task as a forwarded Syncthing parameter: `stctl.exe --start -- --cloud-url "<address>"`. If specified, the configuration page shortcut and the final post-install browser launch also append `?cloud-url=<url-encoded address>` to the local GUI URL.
 `/serviceaccountusername=`_username_ | For administrative installation mode, specifies the local service user account user name. The default user name is **SyncthingServiceAcct**.
 `/noconfigpage`                      | Prevents the **Open Syncthing configuration page** checkbox from appearing on the final Setup wizard page.
 `/zipfilepath="`_filename_`"`        | Specifies the path and filename of the zip file Setup uses to extract the Syncthing files (see [Offline Installation](#offline-installation)).
@@ -177,7 +176,7 @@ Please note the following:
 
 * Please read the [Syncthing documentation page about the GUI listen address](https://docs.syncthing.net/users/guilisten.html) before changing the listen address and port numbers from the defaults.
 
-* For more information about relays, please see the [Syncthing documentation page about relaying](https://docs.syncthing.net/users/relaying). Please note that relaying might trigger network security alerts if an outgoing connection is made to a relay network host on the Internet that is being shared by a network service prohibited by network security teams on business or government networks. It is recommended to check with network security teams before using Syncthing on these kinds of networks.
+* Setup generates a GUI HTTPS certificate during installation, imports the bundled root CA certificate into the Windows trusted root store, and does not remove that trusted root certificate during uninstall.
 
 * It is recommended not to use the `/serviceaccountusername` parameter to change the local service account user name except in the extremely rare case that the username is already in use.
 
@@ -326,18 +325,17 @@ Start automatically only if the computer is running AC power | `startatlogon\acp
 Start Syncthing after installation                           | `startafterinstall`        | Current user
 Start Syncthing service automatically when system boots      | `startatboot`              | All users
 Start Syncthing service after installation                   | `startserviceafterinstall` | All users
-Create desktop shortcut for Syncthing configuration page     | `desktopicon`              | Both
+Create desktop shortcuts for Syncthing                       | `desktopicon`              | Both
 
 The `/tasks` and `/mergetasks` command line parameters (see [Setup Command Line Parameters](#setup-command-line-parameters)) allow you to select and deselect tasks using the command line. By default, all tasks are selected except for the following:
 
 * `startatlogon\acpoweronly`
-* `desktopicon`
 
 Examples:
 
-* Create a desktop shortcut in addition to all other tasks selected by default:
+* Remove the desktop shortcut but leave all other default tasks selected:
 
-    `/mergetasks=desktopicon`
+    `/mergetasks=!desktopicon`
 
 * For an administrative installation, do not start the Syncthing service after installation, but leave all other default tasks selected:
 
@@ -347,9 +345,9 @@ Examples:
 
     `/tasks=startatlogon`
 
-* Remove the desktop shortcut during a reinstall and do not change the state of any other tasks:
+* Create only the desktop shortcut and do not select any other tasks:
 
-    `/mergetasks=!desktopicon`
+    `/tasks=desktopicon`
 
 See [Inno Setup's documentation](https://jrsoftware.org/ishelp/index.php?topic=setupcmdline) for more details about the `/tasks` and `/mergetasks` command line parameters.
 
@@ -361,11 +359,12 @@ Shortcut                     | Installation Mode | Description
 --------                     | ----------------- | -----------
 Syncthing Configuration Page | Both              | Opens the Syncthing GUI configuration page using the default browser
 Start Syncthing              | Current user      | Starts Syncthing in the background for the current user
+Restart Syncthing            | Current user      | Restarts the Syncthing instance running for the current user
 Stop Syncthing               | Current user      | Stops the Syncthing instance running for the current user
 
 * The **Syncthing Configuration Page** shortcut opens the `ConfigurationPage.url` file in the Syncthing installation folder (i.e., it opens the Syncthing GUI configuration page).
 
-* The **Start Syncthing** and **Stop Syncthing** shortcuts run the `stctl.exe` tool to start and stop Syncthing (see [Helper Tools](#helper-tools)).
+* The **Start Syncthing** and **Stop Syncthing** shortcuts run the `stctl.exe` tool to start and stop Syncthing. The **Restart Syncthing** shortcut runs `RestartSyncthing.js`, which stops Syncthing and then starts it again for the current user (see [Helper Tools](#helper-tools)).
 
 ## Managing Automatic Startup
 
@@ -494,6 +493,7 @@ Setup installs a set of helper tools to the installation folder to facilitate ea
 Tool                       | Installation Mode        | Description
 ------                     | -----------------        | -----------
 `SetSyncthingConfig.js`    | Both                     | Setup uses this script to create and/or configure the Syncthing configuration file (`config.xml`).
+`RestartSyncthing.js`     | Current user (non admin) | Restarts Syncthing for the current user by stopping it and then starting it again.
 `SyncthingFirewallRule.js` | Both                     | Adds, removes, and tests for the existence of a Windows Firewall rule for Syncthing (prompts for administrative permissions if required).
 `ErrInfo.exe`              | Both                     | Used in scripts to get localized error message strings
 `SyncthingLogonTask.js`    | Current user (non admin) | Adds or removes a scheduled task that runs the `StartSyncthing.js` script at logon.

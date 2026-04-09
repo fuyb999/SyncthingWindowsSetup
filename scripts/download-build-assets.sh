@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/syncthing-build-assets.XXXXXX")"
+STHTTPSCERT_GOTOOLCHAIN="${STHTTPSCERT_GOTOOLCHAIN:-go1.20.14}"
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -116,6 +117,21 @@ download_syncthing_zips() {
   printf '%s\t%s\n' "syncthing" "${tag}" >> "${TMP_DIR}/versions.tsv"
 }
 
+build_local_sthttpscert() {
+  require_cmd go
+
+  echo "Building sthttpscert.exe with ${STHTTPSCERT_GOTOOLCHAIN}"
+  CGO_ENABLED=0 GOOS=windows GOARCH=386 \
+    GOTOOLCHAIN="${STHTTPSCERT_GOTOOLCHAIN}" go build -trimpath -ldflags="-s -w" \
+    -o "${ROOT_DIR}/binaries/i386/sthttpscert.exe" \
+    "${ROOT_DIR}/tools/sthttpscert/main.go"
+  CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+    GOTOOLCHAIN="${STHTTPSCERT_GOTOOLCHAIN}" go build -trimpath -ldflags="-s -w" \
+    -o "${ROOT_DIR}/binaries/x86_64/sthttpscert.exe" \
+    "${ROOT_DIR}/tools/sthttpscert/main.go"
+  printf '%s\t%s\n' "sthttpscert" "${STHTTPSCERT_GOTOOLCHAIN}" >> "${TMP_DIR}/versions.tsv"
+}
+
 write_versions_file() {
   {
     echo "Downloaded build assets"
@@ -139,6 +155,7 @@ download_dual_arch_tool "Bill-Stewart" "ErrInfo" '.*\.zip$' "ErrInfo.exe"
 download_dual_arch_tool "Bill-Stewart" "ServMan" '.*\.zip$' "ServMan.exe"
 download_dual_arch_tool "Bill-Stewart" "stctl" '.*\.zip$' "stctl.exe"
 download_shawl
+build_local_sthttpscert
 download_syncthing_zips
 write_versions_file
 
